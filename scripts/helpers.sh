@@ -28,6 +28,27 @@ is_freebsd() {
     [ $(uname) == FreeBSD ]
 }
 
+is_openbsd() {
+	[ $(uname) == "OpenBSD" ]
+}
+
+is_cygwin() {
+	command -v WMIC &> /dev/null
+}
+
+is_linux_iostat() {
+	# Bug in early versions of linux iostat -V return error code
+	iostat -c &> /dev/null
+}
+
+cpus_number() {
+	if is_linux; then
+		nproc
+	else
+		sysctl -n hw.ncpu
+	fi
+}
+
 command_exists() {
   local command="$1"
   type "$command" >/dev/null 2>&1
