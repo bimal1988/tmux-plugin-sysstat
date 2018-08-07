@@ -32,7 +32,7 @@ get_cpu_color(){
 }
 
 print_cpu_usage() {
-  local cpu_pused=$(get_cpu_usage_or_collect)
+  local cpu_pused=$(get_cpu_usage)
   local cpu_color=$(get_cpu_color "$cpu_pused")
   
   local cpu_view="$cpu_view_tmpl"
