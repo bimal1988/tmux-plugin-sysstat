@@ -45,12 +45,35 @@ print_cpu_usage() {
 }
 
 get_cpu_usage_or_collect() {
-  local collect_cpu_metric="$cpu_tmp_dir/cpu_collect.metric"
+  if command_exists "iostat"; then
 
-  # read cpu metric from file, otherwise 0 as a temporary null value, until first cpu metric is collected
-  [ -f "$collect_cpu_metric" ] && cat "$collect_cpu_metric" || echo "0.0"
+		if is_linux_iostat; then
+			iostat -c 1 2 | sed '/^\s*$/d' | tail -n 1 | awk '{usage=100-$NF} END {printf("%5.1f", usage)}' | sed 's/,/./'
+		elif is_osx; then
+			iostat -c 2 disk0 | sed '/^\s*$/d' | tail -n 1 | awk '{usage=100-$6} END {printf("%5.1f", usage)}' | sed 's/,/./'
+		elif is_freebsd || is_openbsd; then
+			iostat -c 2 | sed '/^\s*$/d' | tail -n 1 | awk '{usage=100-$NF} END {printf("%5.1f", usage)}' | sed 's/,/./'
+		else
+			echo "Unknown iostat version please create an issue"
+		fi
+	elif command_exists "sar"; then
+		sar -u 1 1 | sed '/^\s*$/d' | tail -n 1 | awk '{usage=100-$NF} END {printf("%5.1f", usage)}' | sed 's/,/./'
+	else
+		if is_cygwin; then
+			usage="$(WMIC cpu get LoadPercentage | grep -Eo '^[0-9]+')"
+			printf "%5.1f" $usage
+		else
+			load=`ps -aux | awk '{print $3}' | tail -n+2 | awk '{s+=$1} END {print s}'`
+			cpus=$(cpus_number)
+			echo "$load $cpus" | awk '{printf "%5.2f", $1/$2}'
+		fi
+	fi
+  # local collect_cpu_metric="$cpu_tmp_dir/cpu_collect.metric"
 
-  start_cpu_collect_if_required >/dev/null 2>&1
+  # # read cpu metric from file, otherwise 0 as a temporary null value, until first cpu metric is collected
+  # [ -f "$collect_cpu_metric" ] && cat "$collect_cpu_metric" || echo "0.0"
+
+  # start_cpu_collect_if_required >/dev/null 2>&1
 }
 
 start_cpu_collect_if_required() {
