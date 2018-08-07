@@ -33,9 +33,6 @@ update_tmux_option() {
 }
 
 main() {
-  cpu_tmp_dir=$(mktemp -d)
-  tmux set-option -gq "@sysstat_cpu_tmp_dir" "$cpu_tmp_dir"
-
   update_tmux_option "status-right"
   update_tmux_option "status-left"
 }

@@ -44,30 +44,33 @@ print_cpu_usage() {
   echo "$cpu_view"
 }
 
-get_cpu_usage_or_collect() {
-  local collect_cpu_metric="$cpu_tmp_dir/cpu_collect.metric"
-
-  # read cpu metric from file, otherwise 0 as a temporary null value, until first cpu metric is collected
-  [ -f "$collect_cpu_metric" ] && cat "$collect_cpu_metric" || echo "0.0"
-
-  start_cpu_collect_if_required >/dev/null 2>&1
-}
-
-start_cpu_collect_if_required() {
-  local collect_cpu_pidfile="$cpu_tmp_dir/cpu_collect.pid"
-
-  # check if cpu collect process is running, otherwise start it in background
-  if [ -f "$collect_cpu_pidfile" ] && ps -p "$(cat "$collect_cpu_pidfile")" > /dev/null 2>&1; then
-    return;
-  fi
+get_cpu_usage() {
+  local sysstat_cpu_started=$(get_tmux_option "@sysstat_cpu_started" "0")
   
-  jobs >/dev/null 2>&1
-  "$CURRENT_DIR/cpu_collect.sh" &>/dev/null &
-  if [ -n "$(jobs -n)" ]; then
-    echo "$!" > "${collect_cpu_pidfile}"
-  else
-    echo "Failed to start CPU collect job" >&2
-    exit 1
+  if [ $sysstat_cpu_started -eq 0 ]; then
+    set_tmux_option "@sysstat_cpu_started" "1"
+    echo "0"
+  elif command_exists "iostat"; then
+ 		if is_linux_iostat; then
+ 			iostat -c 1 2 | sed '/^\s*$/d' | tail -n 1 | awk '{usage=100-$NF} END {printf("%5.1f", usage)}' | sed 's/,/./'
+ 		elif is_osx; then
+ 			iostat -c 2 disk0 | sed '/^\s*$/d' | tail -n 1 | awk '{usage=100-$6} END {printf("%5.1f", usage)}' | sed 's/,/./'
+ 		elif is_freebsd || is_openbsd; then
+ 			iostat -c 2 | sed '/^\s*$/d' | tail -n 1 | awk '{usage=100-$NF} END {printf("%5.1f", usage)}' | sed 's/,/./'
+ 		else
+ 			echo "Unknown iostat version please create an issue"
+ 		fi
+ 	elif command_exists "sar"; then
+ 		sar -u 1 1 | sed '/^\s*$/d' | tail -n 1 | awk '{usage=100-$NF} END {printf("%5.1f", usage)}' | sed 's/,/./'
+ 	else
+ 		if is_cygwin; then
+ 			usage="$(WMIC cpu get LoadPercentage | grep -Eo '^[0-9]+')"
+ 			printf "%5.1f" $usage
+ 		else
+ 			load=`ps -aux | awk '{print $3}' | tail -n+2 | awk '{s+=$1} END {print s}'`
+ 			cpus=$(cpus_number)
+ 			echo "$load $cpus" | awk '{printf "%5.2f", $1/$2}'
+ 		fi
   fi
 }
 
